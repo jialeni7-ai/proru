@@ -1,0 +1,2 @@
+ts_ms,state,symbol,okx_bid,okx_bid_sz,okx_ask,okx_ask_sz,bybit_bid,bybit_bid_sz,bybit_ask,bybit_ask_sz,gap_a_pct,gap_b_pct,usable_usdt,safe_usdt
+1770741884129,opening,RIVERUSDT,17.8260000000,20.0000000000,17.8270000000,65.0000000000,17.9160000000,7.7000000000,17.9200000000,19.0000000000,-0.524554,0.499243,137.9532,96.5672
