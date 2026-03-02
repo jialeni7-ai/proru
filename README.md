@@ -166,14 +166,9 @@ MVP 阶段可先做 paper（模拟成交、只记录 CSV），不接真实下单
 
 ## 三、每日打卡区（强烈建议每天更新一行，GPT 用于监督）
 
-TODAY: 2026-03-01  
+TODAY: 2026-03-02 
 DAY_N: 1  
-CURRENT_MILESTONE: M1  
-DONE_TODAY:
-
-- BLOCKER:
-- TOMORROW_MIN_STEP (<=30min):
--
+DONE_TODAY:先初步写好了okx这边的数据接收模块 并在main.rs中使用
 
 ---
 

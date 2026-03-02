@@ -1,16 +1,11 @@
+mod ws_task;
 
-
-struct Person {
-    name:String,
-    age:u8,
-}
-impl Person {
-    fn say_hello(&self) {
-        println!("我是{}",self.name);
+#[tokio::main]
+async fn main() ->anyhow::Result<()> {
+    tokio::spawn(async {
+        let _= ws_task::okx_ws_task::okx_bbo_tbt_loop("SOL-USDT-SWAP").await;
+    });
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
     }
-}
-
-fn main() {
-    let p1 = Person {name:"小红".to_string(),age:18};
-    p1.say_hello();
 }
