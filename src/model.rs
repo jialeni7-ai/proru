@@ -1,10 +1,10 @@
 #[derive(Clone, Debug)]
 pub struct Quote {
     pub exchange:Exchange,
-    pub bid_px: String,
-    pub bid_sz: String,
-    pub ask_px: String,
-    pub ask_sz: String,
+    pub bid_px: f64,
+    pub bid_sz: f64,
+    pub ask_px: f64,
+    pub ask_sz: f64,
     pub ts: i64,
 }
 

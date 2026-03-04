@@ -30,10 +30,10 @@ fn parse_okx_bbo(txt: &str) -> Option<Quote> {
 
     Some(Quote {
         exchange: Exchange::Okx,
-        bid_px: bid1[0].clone(),
-        bid_sz: bid1[1].clone(),
-        ask_px: ask1[0].clone(),
-        ask_sz: ask1[1].clone(),
+        bid_px: bid1[0].parse().ok()?,
+        bid_sz: bid1[1].parse().ok()?,
+        ask_px: ask1[0].parse().ok()?,
+        ask_sz: ask1[1].parse().ok()?,
         ts: d.ts.parse().ok()?,
     })
 }
