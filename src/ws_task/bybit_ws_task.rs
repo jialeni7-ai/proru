@@ -1,4 +1,4 @@
-use crate::model::{Exchange, Quote};
+use crate::model::quote::{Exchange,Quote};
 use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
