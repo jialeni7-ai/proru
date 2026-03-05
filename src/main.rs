@@ -2,19 +2,17 @@ mod model;
 mod ws_task;
 mod coreFn;
 mod executor;
+mod monitor;
 use model::quote::{Exchange,Quote};
-use serde::Deserialize;
-use tokio::select;
-use tokio::sync::watch;
-
-
-use ws_task::bybit_ws_task::bybit_ws_task;
-use ws_task::okx_ws_task::okx_bbo_tbt_loop;
-
-use coreFn::engine;
+use tokio::time::{sleep, Duration};
+use executor::{okx_open::okx_open,okx_close::okx_close};
+use monitor::okx_monitor::okx_monitor;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    engine::engine().await?;
+    // okx_open().await?;
+    okx_monitor().await?;
+    sleep(Duration::from_secs(5)).await;
+    // okx_close().await?;
     Ok(())
 }
 

@@ -293,6 +293,7 @@ dependencies = [
  "futures-util",
  "hmac",
  "http",
+ "rand 0.8.5",
  "reqwest",
  "rust_decimal",
  "serde",

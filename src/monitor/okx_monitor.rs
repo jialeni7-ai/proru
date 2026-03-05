@@ -14,7 +14,7 @@ fn sign(secret: &str, prehash: &str) -> String {
     general_purpose::STANDARD.encode(mac.finalize().into_bytes())
 }
 
-pub async fn okx_close() -> Result<()> {
+pub async fn okx_monitor() -> Result<()> {
     dotenv().ok();
     let api_key = env::var("OKX_API_KEY")?;
     let secret = env::var("OKX_SECRET_KEY")?;
@@ -52,28 +52,33 @@ pub async fn okx_close() -> Result<()> {
         break;
     }
 
-    let order_msg = serde_json::json!({
-        "id":1,
-        "op": "order",
-        "args": [{
-            "instId": "IP-USDT-SWAP",
-            "tdMode": "cross",
-            "side": "sell",
-            "ordType": "market",
-            "sz": "1",
-            "reduceOnly":true,
+    let account = serde_json::json!({
+        "op":"subscribe",
+        "args":[{
+        "channel":"account"
         }]
     });
-    write.send(Message::Text(order_msg.to_string().into())).await?;
-    println!("已经发送平仓单");
-
+    write
+        .send(Message::Text(account.to_string().into()))
+        .await?;
+    println!("已经发送检测");
     while let Some(msg) = read.next().await {
         let msg = msg?;
+
         if let Message::Text(text) = msg {
-            println!("order返回：{}",text);
-            break;
+            if text.contains("mgnRatio") {
+                let v: serde_json::Value = serde_json::from_str(&text)?;
+
+                let ratio_str = v["data"][0]["details"][0]["mgnRatio"]
+                    .as_str()
+                    .unwrap_or("");
+
+                if !ratio_str.is_empty() {
+                    let ratio: f64 = ratio_str.parse()?;
+                    println!("保证金率: {}", ratio);
+                }
+            }
         }
     }
-
     Ok(())
 }
