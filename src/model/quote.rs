@@ -5,7 +5,7 @@ pub struct Quote {
     pub bid_sz: f64,
     pub ask_px: f64,
     pub ask_sz: f64,
-    pub ts: i64,
+    pub ts: u64,
 }
 
 #[derive(Clone, Debug)]

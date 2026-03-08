@@ -1,16 +1,21 @@
 use crate::coreFn::strategy::strategy;
-use crate::model::{quote::{Exchange, Quote},signal::{State,Signal}};
+use crate::executor::{
+    bybit_close::bybit_close, bybit_open::bybit_open, okx_close::okx_close, okx_open::okx_open,
+};
+use crate::model::{
+    quote::{Exchange, Quote},
+    signal::{Signal, State},
+};
 use crate::ws_task::{bybit_ws_task::bybit_ws_task, okx_ws_task::okx_bbo_tbt_loop};
+use serde::Deserialize;
 use tokio::select;
 use tokio::sync::watch;
-use serde::Deserialize;
-
 
 pub async fn engine() -> anyhow::Result<()> {
     let ct_mult = get_okx_ct_mult("SOL-USDT-SWAP").await?;
     let mut state = State::Idle;
     let (okx_tx, mut okx_rx) = watch::channel::<Option<Quote>>(None);
-    let (bybit_tx,mut bybit_rx) = watch::channel::<Option<Quote>>(None);
+    let (bybit_tx, mut bybit_rx) = watch::channel::<Option<Quote>>(None);
     tokio::spawn(async move {
         let _ = okx_bbo_tbt_loop("SOL-USDT-SWAP", okx_tx).await;
     });
@@ -33,14 +38,16 @@ pub async fn engine() -> anyhow::Result<()> {
             }
         }
 
-        if let (Some(okx),Some(bybit)) = (&last_okx,&last_bybit) {
-            if let Some(signal) = strategy(okx, bybit, ct_mult,&mut state) {
+        if let (Some(okx), Some(bybit)) = (&last_okx, &last_bybit) {
+            if let Some(signal) = strategy(okx, bybit, ct_mult, &mut state) {
                 match signal {
                     Signal::OpenOkxLongBybitShort => {
-                        println!("开仓 OKX多 BYBIT空");
+                        okx_open().await?;
+                        bybit_open().await?;
                     }
                     Signal::Close => {
-                        println!("平仓");
+                        okx_close().await?;
+                        bybit_close().await?;
                     }
                 }
             }
@@ -49,16 +56,13 @@ pub async fn engine() -> anyhow::Result<()> {
     Ok(())
 }
 
-
-
-
 #[derive(Deserialize)]
 struct OkxInstResp {
     data: Vec<OkxInstData>,
 }
 #[derive(Deserialize)]
 struct OkxInstData {
-    #[serde(rename="ctVal")]
+    #[serde(rename = "ctVal")]
     ct_val: String,
 }
 
@@ -67,9 +71,10 @@ pub async fn get_okx_ct_mult(inst_id: &str) -> anyhow::Result<f64> {
         "https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId={}",
         inst_id
     );
-        let resp: OkxInstResp = reqwest::get(&url).await?.json().await?;
+    let resp: OkxInstResp = reqwest::get(&url).await?.json().await?;
 
-    let ct_mult = resp.data
+    let ct_mult = resp
+        .data
         .get(0)
         .ok_or(anyhow::anyhow!("no instrument"))?
         .ct_val

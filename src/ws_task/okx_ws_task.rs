@@ -44,7 +44,6 @@ pub async fn okx_bbo_tbt_loop(inst_id: &str, tx: watch::Sender<Option<Quote>>) -
         println!("okx连接中...");
         match connect_async(url).await {
             Ok((mut ws_stream, _)) => {
-                println!("okx已连接");
                 let subscribe_msg = json!({
                     "op": "subscribe",
                     "args": [{
@@ -60,8 +59,6 @@ pub async fn okx_bbo_tbt_loop(inst_id: &str, tx: watch::Sender<Option<Quote>>) -
                         Ok(Message::Text(txt)) => {
                             if let Some(bbo) = parse_okx_bbo(&txt) {
                                 let _ = tx.send(Some(bbo));
-                            } else {
-                                println!("其他数据：{}", txt);
                             }
                         }
                         Ok(Message::Ping(payload)) => {
@@ -69,7 +66,7 @@ pub async fn okx_bbo_tbt_loop(inst_id: &str, tx: watch::Sender<Option<Quote>>) -
                         }
                         Ok(_) => {}
                         Err(e) => {
-                            println!("[okx] ws error: {e:?}");
+                            println!("[okx] WS报错: {e:?}");
                             break;
                         }
                     }

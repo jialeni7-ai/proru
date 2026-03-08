@@ -1,12 +1,12 @@
-use crate::model::quote::{Exchange, Quote};
+use crate::model::quote::{ Quote};
 use crate::model::signal::{Signal, State};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn now_ms() -> i64 {
+pub fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
-        .as_millis() as i64
+        .as_millis() as u64
 }
 
 pub fn strategy(okx: &Quote, bybit: &Quote, ct_mult: f64, state: &mut State) -> Option<Signal> {
@@ -17,7 +17,7 @@ pub fn strategy(okx: &Quote, bybit: &Quote, ct_mult: f64, state: &mut State) -> 
     if now - bybit.ts > 300 {
         return None;
     }
-    if (okx.ts - bybit.ts).abs() > 80 {
+    if okx.ts.abs_diff(bybit.ts) > 80 {
         return None;
     }
     let entry_spread = (bybit.bid_px - okx.ask_px) / okx.ask_px;

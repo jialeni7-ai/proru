@@ -2,7 +2,6 @@ use crate::model::quote::{Exchange,Quote};
 use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
-use serde_json::json;
 use tokio::sync::watch;
 use tokio::time::{Duration, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -13,8 +12,8 @@ struct BybitMsg {
     topic: String,
     #[serde(default)]
     r#type: String,
-    ts: i64,
-    cts: i64,
+    ts: u64,
+    cts: u64,
     #[serde(default)]
     data: BybitData,
 }
@@ -43,7 +42,7 @@ fn parse_bybit_bbo(txt: &str) -> Option<Quote> {
     })
 }
 
-pub async fn bybit_ws_task(inst_id: &str, tx: watch::Sender<Option<Quote>>) -> anyhow::Result<()> {
+pub async fn bybit_ws_task(inst_id: &str, tx: watch::Sender<Option<Quote>>) -> Result<()> {
     let url = "wss://stream.bybit.com/v5/public/linear";
     let sub = serde_json::json! ({
         "op" : "subscribe",
@@ -57,17 +56,16 @@ pub async fn bybit_ws_task(inst_id: &str, tx: watch::Sender<Option<Quote>>) -> a
                 Ok(Message::Text(txt)) => {
                     if let Some(bbo) = parse_bybit_bbo(&txt) {
                         let _ = tx.send(Some(bbo));
-                    } else {
-                        println!("异常数据:{}", txt);
                     }
                 }
                 Ok(_) => {}
                 Err(e) => {
+                    println!("bybit报错：{}",e);
                     break;
                 }
             }
         }
-        tx.send(None);
+        let _ = tx.send(None);
         sleep(Duration::from_secs(1)).await;
     }
 }

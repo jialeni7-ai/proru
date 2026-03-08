@@ -3,11 +3,10 @@ use chrono::Utc;
 use dotenvy::dotenv;
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
-use serde_json::{self, to_string};
+use serde_json::{self, Value};
 use sha2::Sha256;
 use std::env;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-
 type HmacSha256 = Hmac<Sha256>;
 
 fn sign(secret: &str, payload: &str) -> String {
@@ -16,11 +15,11 @@ fn sign(secret: &str, payload: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
-pub async fn bybit_open() -> Result<()> {
+pub async fn bybit_monitor() -> Result<()> {
     dotenv().ok();
     let api_key = env::var("BYBIT_API_KEY")?;
     let secret = env::var("BYBIT_SECRET")?;
-    let url = "wss://stream.bybit.com/v5/trade";
+    let url = "wss://stream.bybit.com/v5/private";
     let (mut ws, _) = connect_async(url).await?;
     println!("已经连接");
 
@@ -36,7 +35,7 @@ pub async fn bybit_open() -> Result<()> {
         "op":"auth",
         "args":[
             api_key,
-            expires,
+            expires.to_string(),
             signature
         ]
     });
@@ -54,42 +53,20 @@ pub async fn bybit_open() -> Result<()> {
             break;
         }
     }
-
-    let order_msg = serde_json::json!({
-        "op":"order.create",
-        "header":{
-            "X-BAPI-TIMESTAMP":ts.to_string()
-        },
-        "args":[{
-
-            "symbol":"IPUSDT",
-
-            "side":"Buy",
-
-            "orderType":"Market",
-
-            "qty":"6",
-
-            "category":"linear",
-
-            "timeInForce":"IOC",
-
-        }]
+    let sub = serde_json::json!({
+        "op":"subscribe",
+        "args":[
+                "wallet"
+        ]
     });
-    write
-        .send(Message::Text(order_msg.to_string().into()))
-        .await?;
-    println!("已经发送 BYBIT 开多");
 
+    write.send(Message::Text(sub.to_string().into())).await?;
+    println!("已订阅 account");
     while let Some(msg) = read.next().await {
         let msg = msg?;
-
         if let Message::Text(text) = msg {
-            println!("order返回: {}", text);
-
-            break;
+            println!("原始数据：{}", text);
         }
     }
-
     Ok(())
 }
