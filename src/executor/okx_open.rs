@@ -1,78 +1,46 @@
-use anyhow::{Result, anyhow};
-use base64::{Engine, engine::general_purpose};
-use chrono::Utc;
-use dotenvy::dotenv;
+use anyhow::{bail, Result};
 use futures_util::{SinkExt, StreamExt};
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
-use std::env;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio::net::TcpStream;
+use tokio_tungstenite::{
+    MaybeTlsStream, WebSocketStream,
+    tungstenite::Message,
+};
 
-fn sign(secret: &str, prehash: &str) -> String {
-    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
-    mac.update(prehash.as_bytes());
-    general_purpose::STANDARD.encode(mac.finalize().into_bytes())
-}
+pub type OkxWrite = futures_util::stream::SplitSink<
+    WebSocketStream<MaybeTlsStream<TcpStream>>,
+    Message,
+>;
 
-pub async fn okx_open() -> Result<()> {
-    dotenv().ok();
-    let api_key = env::var("OKX_API_KEY")?;
-    let secret = env::var("OKX_SECRET_KEY")?;
-    let passphrase = env::var("OKX_PASSPHRASE")?;
+pub type OkxRead = futures_util::stream::SplitStream<
+    WebSocketStream<MaybeTlsStream<TcpStream>>,
+>;
 
-    let url = "wss://ws.okx.com:8443/ws/v5/private";
-    let (mut ws, _) = connect_async(url).await?;
-    println!("已连接");
-
-    let (mut write, mut read) = ws.split();
-    let ts = Utc::now().timestamp().to_string();
-    let prehash = format!("{ts}GET/users/self/verify");
-    let sign = sign(&secret, &prehash);
-    let login = serde_json::json!({
-        "op":"login",
-        "args":[{
-            "apiKey":api_key,
-            "passphrase":passphrase,
-            "timestamp":ts,
-            "sign":sign
-        }]
-    });
-
-    write.send(Message::Text(login.to_string().into())).await?;
-    println!("已发送login");
-
-    let mut login_ok = false;
-    while let Some(msg) = read.next().await {
-        let msg = msg?;
-        if let Message::Text(text) = msg {
-            if text.contains("\"code\":\"0\"") {
-                break;
-            }
-        }
-        break;
+pub async fn okx_open(
+    write: &mut OkxWrite,
+    inst_id: &str,
+    side: &str,   // "buy" / "sell"
+    sz: &str,
+) -> Result<()> {
+    if side != "buy" && side != "sell" {
+        bail!("side must be buy or sell");
     }
 
     let order_msg = serde_json::json!({
-        "id":1,
+        "id": "okx-open-1",
         "op": "order",
         "args": [{
-            "instId": "IP-USDT-SWAP",
+            "instId": inst_id,
             "tdMode": "cross",
-            "side": "buy",
+            "side": side,
             "ordType": "market",
-            "sz": "1"
+            "sz": sz
         }]
     });
-    write.send(Message::Text(order_msg.to_string().into())).await?;
-    println!("已经发送开仓单");
 
-    while let Some(msg) = read.next().await {
-        let msg = msg?;
-        if let Message::Text(text) = msg {
-            println!("order返回：{}",text);
-            break;
-        }
-    }
+    write
+        .send(Message::Text(order_msg.to_string().into()))
+        .await?;
 
+    println!("OKX 已发送开仓单: side={}, sz={}", side, sz);
     Ok(())
 }
