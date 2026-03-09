@@ -26,7 +26,7 @@ pub async fn okx_open(
     }
 
     let order_msg = serde_json::json!({
-        "id": "okx-open-1",
+        "id": "1",
         "op": "order",
         "args": [{
             "instId": inst_id,

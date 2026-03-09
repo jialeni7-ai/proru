@@ -1,9 +1,9 @@
 use crate::coreFn::strategy::strategy;
 use crate::executor::{
     bybit_close::bybit_close,
-    bybit_open::{bybit_open, BybitRead, BybitWrite},
+    bybit_open::{BybitRead, BybitWrite, bybit_open},
     okx_close::okx_close,
-    okx_open::{okx_open, OkxRead, OkxWrite},
+    okx_open::{OkxRead, OkxWrite, okx_open},
 };
 use crate::model::{
     quote::Quote,
@@ -11,7 +11,7 @@ use crate::model::{
 };
 use crate::ws_task::{bybit_ws_task::bybit_ws_task, okx_ws_task::okx_bbo_tbt_loop};
 
-use base64::{engine::general_purpose, Engine};
+use base64::{Engine, engine::general_purpose};
 use chrono::Utc;
 use dotenvy::dotenv;
 use futures_util::{SinkExt, StreamExt};
@@ -24,18 +24,17 @@ use tokio::sync::watch;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 pub async fn engine() -> anyhow::Result<()> {
-    let target_coin = 1.0_f64;
-    let ct_mult = get_okx_ct_mult("SOL-USDT-SWAP").await?;
-    let okx_sz = (target_coin / ct_mult).floor() as u64;
-    let okx_sz = okx_sz.to_string();
-    let bybit_qty = target_coin.to_string();
+    // let target_coin = 14.0_f64;
+    let ct_mult = get_okx_ct_mult("FLOW-USDT-SWAP").await?;
+    // let okx_sz = (target_coin / ct_mult).floor() as u64;
+    let okx_sz = 14.to_string();
+    let bybit_qty = 140.to_string();
 
     let mut state = State::Idle;
 
     // 先登录交易 ws
     let (mut okx_write, okx_read) = okx_login().await?;
     let (mut bybit_write, bybit_read) = bybit_login().await?;
-    println!("交易连接已就绪");
 
     // 行情 channel
     let (okx_tx, mut okx_rx) = watch::channel::<Option<Quote>>(None);
@@ -47,10 +46,10 @@ pub async fn engine() -> anyhow::Result<()> {
 
     // 行情任务
     tokio::spawn(async move {
-        let _ = okx_bbo_tbt_loop("SOL-USDT-SWAP", okx_tx).await;
+        let _ = okx_bbo_tbt_loop("FLOW-USDT-SWAP", okx_tx).await;
     });
     tokio::spawn(async move {
-        let _ = bybit_ws_task("SOLUSDT", bybit_tx).await;
+        let _ = bybit_ws_task("FLOWUSDT", bybit_tx).await;
     });
 
     // 交易 ws 空读守卫
@@ -128,11 +127,16 @@ pub async fn engine() -> anyhow::Result<()> {
         }
 
         if let (Some(okx), Some(bybit)) = (&last_okx, &last_bybit) {
-            if let Some(signal) = strategy(okx, bybit, ct_mult, &mut state) {
+            if let Some(signal) = strategy(okx, bybit, ct_mult, &state) {
                 match signal {
                     Signal::OpenOkxLongBybitShort => {
+                        println!("触发开仓信号");
+                        state = State::Opened;
+
                         // OKX 开多
-                        if let Err(e) = okx_open(&mut okx_write, "SOL-USDT-SWAP", "buy", &okx_sz).await {
+                        if let Err(e) =
+                            okx_open(&mut okx_write, "FLOW-USDT-SWAP", "buy", &okx_sz).await
+                        {
                             eprintln!("OKX 开仓失败，尝试重连: {}", e);
 
                             let (new_okx_write, new_okx_read) = okx_login().await?;
@@ -145,11 +149,18 @@ pub async fn engine() -> anyhow::Result<()> {
                                 let _ = okx_read_guard(new_okx_read, new_okx_alive_tx).await;
                             });
 
-                            okx_open(&mut okx_write, "SOL-USDT-SWAP", "buy", &okx_sz).await?;
+                            if let Err(e2) =
+                                okx_open(&mut okx_write, "FLOW-USDT-SWAP", "buy", &okx_sz).await
+                            {
+                                state = State::Idle;
+                                anyhow::bail!("OKX 重连后开仓仍失败: {}", e2);
+                            }
                         }
 
                         // Bybit 开空
-                        if let Err(e) = bybit_open(&mut bybit_write, "SOLUSDT", "Sell", &bybit_qty).await {
+                        if let Err(e) =
+                            bybit_open(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
+                        {
                             eprintln!("Bybit 开仓失败，尝试重连: {}", e);
 
                             let (new_bybit_write, new_bybit_read) = bybit_login().await?;
@@ -162,13 +173,24 @@ pub async fn engine() -> anyhow::Result<()> {
                                 let _ = bybit_read_guard(new_bybit_read, new_bybit_alive_tx).await;
                             });
 
-                            bybit_open(&mut bybit_write, "SOLUSDT", "Sell", &bybit_qty).await?;
+                            if let Err(e2) =
+                                bybit_open(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
+                            {
+                                state = State::Idle;
+                                anyhow::bail!("Bybit 重连后开仓仍失败: {}", e2);
+                            }
                         }
+
+                        println!("开仓完成，当前状态: Opened");
                     }
 
                     Signal::Close => {
+                        println!("触发平仓信号");
+
                         // OKX 平多
-                        if let Err(e) = okx_close(&mut okx_write, "SOL-USDT-SWAP", "sell", &okx_sz).await {
+                        if let Err(e) =
+                            okx_close(&mut okx_write, "FLOW-USDT-SWAP", "sell", &okx_sz).await
+                        {
                             eprintln!("OKX 平仓失败，尝试重连: {}", e);
 
                             let (new_okx_write, new_okx_read) = okx_login().await?;
@@ -181,11 +203,13 @@ pub async fn engine() -> anyhow::Result<()> {
                                 let _ = okx_read_guard(new_okx_read, new_okx_alive_tx).await;
                             });
 
-                            okx_close(&mut okx_write, "SOL-USDT-SWAP", "sell", &okx_sz).await?;
+                            okx_close(&mut okx_write, "FLOW-USDT-SWAP", "sell", &okx_sz).await?;
                         }
 
                         // Bybit 平空
-                        if let Err(e) = bybit_close(&mut bybit_write, "SOLUSDT", "Buy", &bybit_qty).await {
+                        if let Err(e) =
+                            bybit_close(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await
+                        {
                             eprintln!("Bybit 平仓失败，尝试重连: {}", e);
 
                             let (new_bybit_write, new_bybit_read) = bybit_login().await?;
@@ -198,8 +222,11 @@ pub async fn engine() -> anyhow::Result<()> {
                                 let _ = bybit_read_guard(new_bybit_read, new_bybit_alive_tx).await;
                             });
 
-                            bybit_close(&mut bybit_write, "SOLUSDT", "Buy", &bybit_qty).await?;
+                            bybit_close(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await?;
                         }
+
+                        println!("平仓完成，程序结束");
+                        return Ok(());
                     }
                 }
             }
@@ -241,6 +268,7 @@ fn sign(secret: &str, prehash: &str) -> String {
     general_purpose::STANDARD.encode(mac.finalize().into_bytes())
 }
 
+// 登陆逻辑
 async fn okx_login() -> anyhow::Result<(OkxWrite, OkxRead)> {
     dotenv().ok();
     let api_key = env::var("OKX_API_KEY")?;
@@ -336,10 +364,7 @@ async fn bybit_login() -> anyhow::Result<(BybitWrite, BybitRead)> {
     anyhow::bail!("Bybit 登录时连接断开")
 }
 
-pub async fn okx_read_guard(
-    mut read: OkxRead,
-    tx: watch::Sender<bool>,
-) -> anyhow::Result<()> {
+pub async fn okx_read_guard(mut read: OkxRead, tx: watch::Sender<bool>) -> anyhow::Result<()> {
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
@@ -358,10 +383,7 @@ pub async fn okx_read_guard(
     anyhow::bail!("okx read closed")
 }
 
-pub async fn bybit_read_guard(
-    mut read: BybitRead,
-    tx: watch::Sender<bool>,
-) -> anyhow::Result<()> {
+pub async fn bybit_read_guard(mut read: BybitRead, tx: watch::Sender<bool>) -> anyhow::Result<()> {
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
