@@ -133,7 +133,7 @@ pub async fn engine() -> anyhow::Result<()> {
                         println!("触发开仓信号");
                         state = State::Opened;
 
-                        // OKX 开多
+                        // OKX 开空
                         if let Err(e) =
                             okx_open(&mut okx_write, "FLOW-USDT-SWAP", "buy", &okx_sz).await
                         {
@@ -150,14 +150,14 @@ pub async fn engine() -> anyhow::Result<()> {
                             });
 
                             if let Err(e2) =
-                                okx_open(&mut okx_write, "FLOW-USDT-SWAP", "buy", &okx_sz).await
+                                okx_open(&mut okx_write, "FLOW-USDT-SWAP", "sell", &okx_sz).await
                             {
                                 state = State::Idle;
                                 anyhow::bail!("OKX 重连后开仓仍失败: {}", e2);
                             }
                         }
 
-                        // Bybit 开空
+                        // Bybit 开多
                         if let Err(e) =
                             bybit_open(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
                         {
@@ -174,7 +174,7 @@ pub async fn engine() -> anyhow::Result<()> {
                             });
 
                             if let Err(e2) =
-                                bybit_open(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
+                                bybit_open(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await
                             {
                                 state = State::Idle;
                                 anyhow::bail!("Bybit 重连后开仓仍失败: {}", e2);
@@ -262,10 +262,17 @@ pub async fn get_okx_ct_mult(inst_id: &str) -> anyhow::Result<f64> {
     Ok(ct_mult)
 }
 
-fn sign(secret: &str, prehash: &str) -> String {
+fn sign_okx(secret: &str, prehash: &str) -> String {
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
     mac.update(prehash.as_bytes());
     general_purpose::STANDARD.encode(mac.finalize().into_bytes())
+}
+
+fn sign_bybit(secret: &str, prehash: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+    mac.update(prehash.as_bytes());
+    let result = mac.finalize().into_bytes();
+    hex::encode(result)
 }
 
 // 登陆逻辑
@@ -283,7 +290,7 @@ async fn okx_login() -> anyhow::Result<(OkxWrite, OkxRead)> {
 
     let ts = Utc::now().timestamp().to_string();
     let prehash = format!("{ts}GET/users/self/verify");
-    let sign = sign(&secret, &prehash);
+    let sign = sign_okx(&secret, &prehash);
 
     let login = serde_json::json!({
         "op":"login",
@@ -331,7 +338,7 @@ async fn bybit_login() -> anyhow::Result<(BybitWrite, BybitRead)> {
 
     let expires = Utc::now().timestamp_millis() + 5000;
     let sign_payload = format!("GET/realtime{}", expires);
-    let signature = sign(&secret, &sign_payload);
+    let signature = sign_bybit(&secret, &sign_payload);
 
     let login_msg = serde_json::json!({
         "op":"auth",
@@ -351,7 +358,7 @@ async fn bybit_login() -> anyhow::Result<(BybitWrite, BybitRead)> {
             let v: serde_json::Value = serde_json::from_str(&text)?;
 
             if v["op"] == "auth" {
-                if v["retCode"] == 0 {
+                if v["retCode"] == 0 || v["success"] == true {
                     println!("Bybit 登录成功");
                     return Ok((write, read));
                 } else {

@@ -41,7 +41,6 @@ pub async fn okx_bbo_tbt_loop(inst_id: &str, tx: watch::Sender<Option<Quote>>) -
     let url = "wss://ws.okx.com:8443/ws/v5/public";
 
     loop {
-        println!("okx连接中...");
         match connect_async(url).await {
             Ok((mut ws_stream, _)) => {
                 let subscribe_msg = json!({
