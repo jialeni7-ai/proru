@@ -24,7 +24,7 @@ pub fn strategy(okx: &Quote, bybit: &Quote, ct_mult: f64, state: &State) -> Opti
     let exit_spread = (bybit.ask_px - okx.bid_px) / okx.bid_px;
     match *state {
         State::Idle => {
-            if okx.bid_sz * ct_mult >= 10.0 && bybit.ask_sz >= 10.0 && entry_spread >= 0.006 {
+            if okx.bid_sz * ct_mult >= 10.0 && bybit.ask_sz >= 10.0 && entry_spread >= 0.0055 {
                 return Some(Signal::OpenOkxLongBybitShort);
             }
         }

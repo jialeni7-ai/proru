@@ -208,7 +208,7 @@ pub async fn engine() -> anyhow::Result<()> {
 
                         // Bybit 平空
                         if let Err(e) =
-                            bybit_close(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
+                            bybit_close(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await
                         {
                             eprintln!("Bybit 平仓失败，尝试重连: {}", e);
 
@@ -222,7 +222,7 @@ pub async fn engine() -> anyhow::Result<()> {
                                 let _ = bybit_read_guard(new_bybit_read, new_bybit_alive_tx).await;
                             });
 
-                            bybit_close(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await?;
+                            bybit_close(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await?;
                         }
 
                         println!("平仓完成，程序结束");
