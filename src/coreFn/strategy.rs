@@ -21,8 +21,6 @@ pub fn strategy(okx: &Quote, bybit: &Quote, ct_mult: f64, state: &State) -> Opti
         return None;
     }
     let entry_spread = (bybit.bid_px - okx.ask_px) / okx.ask_px;
-    // let entry_spread = (okx.bid_px - bybit.ask_px) / bybit.ask_px;
-    // println!("{}",entry_spread);
     let exit_spread = (bybit.ask_px - okx.bid_px) / okx.bid_px;
     match *state {
         State::Idle => {

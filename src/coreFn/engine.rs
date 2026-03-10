@@ -133,9 +133,9 @@ pub async fn engine() -> anyhow::Result<()> {
                         println!("触发开仓信号");
                         state = State::Opened;
 
-                        // OKX 开空
+                        // OKX 开多
                         if let Err(e) =
-                            okx_open(&mut okx_write, "FLOW-USDT-SWAP", "sell", &okx_sz).await
+                            okx_open(&mut okx_write, "FLOW-USDT-SWAP", "buy", &okx_sz).await
                         {
                             eprintln!("OKX 开仓失败，尝试重连: {}", e);
 
@@ -150,16 +150,16 @@ pub async fn engine() -> anyhow::Result<()> {
                             });
 
                             if let Err(e2) =
-                                okx_open(&mut okx_write, "FLOW-USDT-SWAP", "sell", &okx_sz).await
+                                okx_open(&mut okx_write, "FLOW-USDT-SWAP", "buy", &okx_sz).await
                             {
                                 state = State::Idle;
                                 anyhow::bail!("OKX 重连后开仓仍失败: {}", e2);
                             }
                         }
 
-                        // Bybit 开多
+                        // Bybit 开空
                         if let Err(e) =
-                            bybit_open(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await
+                            bybit_open(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
                         {
                             eprintln!("Bybit 开仓失败，尝试重连: {}", e);
 
@@ -174,7 +174,7 @@ pub async fn engine() -> anyhow::Result<()> {
                             });
 
                             if let Err(e2) =
-                                bybit_open(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await
+                                bybit_open(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
                             {
                                 state = State::Idle;
                                 anyhow::bail!("Bybit 重连后开仓仍失败: {}", e2);
@@ -208,7 +208,7 @@ pub async fn engine() -> anyhow::Result<()> {
 
                         // Bybit 平空
                         if let Err(e) =
-                            bybit_close(&mut bybit_write, "FLOWUSDT", "sell", &bybit_qty).await
+                            bybit_close(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
                         {
                             eprintln!("Bybit 平仓失败，尝试重连: {}", e);
 
@@ -222,7 +222,7 @@ pub async fn engine() -> anyhow::Result<()> {
                                 let _ = bybit_read_guard(new_bybit_read, new_bybit_alive_tx).await;
                             });
 
-                            bybit_close(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await?;
+                            bybit_close(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await?;
                         }
 
                         println!("平仓完成，程序结束");
