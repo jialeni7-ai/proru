@@ -135,7 +135,7 @@ pub async fn engine() -> anyhow::Result<()> {
 
                         // OKX 开空
                         if let Err(e) =
-                            okx_open(&mut okx_write, "FLOW-USDT-SWAP", "buy", &okx_sz).await
+                            okx_open(&mut okx_write, "FLOW-USDT-SWAP", "sell", &okx_sz).await
                         {
                             eprintln!("OKX 开仓失败，尝试重连: {}", e);
 
@@ -159,7 +159,7 @@ pub async fn engine() -> anyhow::Result<()> {
 
                         // Bybit 开多
                         if let Err(e) =
-                            bybit_open(&mut bybit_write, "FLOWUSDT", "Sell", &bybit_qty).await
+                            bybit_open(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await
                         {
                             eprintln!("Bybit 开仓失败，尝试重连: {}", e);
 
@@ -208,7 +208,7 @@ pub async fn engine() -> anyhow::Result<()> {
 
                         // Bybit 平空
                         if let Err(e) =
-                            bybit_close(&mut bybit_write, "FLOWUSDT", "Buy", &bybit_qty).await
+                            bybit_close(&mut bybit_write, "FLOWUSDT", "sell", &bybit_qty).await
                         {
                             eprintln!("Bybit 平仓失败，尝试重连: {}", e);
 
